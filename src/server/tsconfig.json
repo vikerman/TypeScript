@@ -17,6 +17,7 @@
         "scriptInfo.ts",
         "lsHost.ts",
         "typingsCache.ts",
+        "g3ServerHostProxy.ts",
         "project.ts",
         "editorServices.ts",
         "protocol.ts",

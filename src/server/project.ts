@@ -4,6 +4,7 @@
 /// <reference path="lsHost.ts"/>
 /// <reference path="typingsCache.ts"/>
 /// <reference path="builder.ts"/>
+/// <reference path="g3ServerHostProxy.ts"/>
 
 namespace ts.server {
 
@@ -119,6 +120,8 @@ namespace ts.server {
         // wrapper over the real language service that will suppress all semantic operations
         protected languageService: LanguageService;
 
+        public readonly proxyHost: ServerHost;
+
         public languageServiceEnabled = true;
 
         protected readonly lsHost: LSHost;
@@ -202,7 +205,18 @@ namespace ts.server {
 
             this.setInternalCompilerOptionsForEmittingJsFiles();
 
-            this.lsHost = new LSHost(this.projectService.host, this, this.projectService.cancellationToken);
+            // Create a proxy server host that uses the files list to respond to
+            // fileExists and directoryExists so as to avoid going to the
+            // file system every time.
+            this.proxyHost = this.projectService.host;
+            if (projectKind === ProjectKind.Configured && hasExplicitListOfFiles) {
+                this.proxyHost = getG3ServerHostProxy(
+                    projectName,
+                    this.projectService.host,
+                    this.projectService.logger);
+            }
+
+            this.lsHost = new LSHost(this.proxyHost, this, this.projectService.cancellationToken);
             this.lsHost.setCompilationSettings(this.compilerOptions);
 
             this.languageService = ts.createLanguageService(this.lsHost, this.documentRegistry);
@@ -727,7 +741,7 @@ namespace ts.server {
             }
 
             const allFileNames = arrayFrom(referencedFiles.keys()) as Path[];
-            return filter(allFileNames, file => this.projectService.host.fileExists(file));
+            return filter(allFileNames, file => this.proxyHost.fileExists(file));
         }
 
         // remove a root file from project
